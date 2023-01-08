@@ -55,7 +55,7 @@ NAMESPACE = os.environ['ROBOT_NAMESPACE']
 class BasicNavigator(Node):
 
     def __init__(self):
-        super().__init__(node_name='basic_navigator', namespace=NAMESPACE)
+        super().__init__(node_name="basic_navigator", namespace=NAMESPACE)
         self.initial_pose = PoseStamped()
         self.initial_pose.header.frame_id = 'map'
         self.goal_handle = None
