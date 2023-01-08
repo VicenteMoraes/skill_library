@@ -41,7 +41,7 @@ class Skills(Node):
         self.nav.setInitialPose(self.initial_pose)
 
     def publish_log(self, message: str):
-        now = str(self.nav.get_clock().now())
+        now = str(self.get_clock().now())
         log_msg = String()
         log_msg.data = f"{now}_{message}"
         self.log_pub.publish(log_msg)
@@ -65,22 +65,29 @@ class Skills(Node):
 
         self.nav.followWaypoints(goal_poses)
 
-    async def create_wait_message(self, topic: str, wait_period: float = None):
-        wait_period = wait_period if wait_period is not None else self.wait_period
+    async def create_wait_message(self, topic: str):
         self.waitmsg_sub = self.create_subscription(String, topic, self.msg_received, 1)
-        self.timer = self.create_timer(wait_period, self.msg_not_received)
-        await asyncio.sleep(wait_period)
-        return self.message
 
     def msg_received(self, msg):
-        self.timer.destroy()
         self.publish_log("message received")
         self.message = msg.data
 
     def msg_not_received(self):
-        self.timer.destroy()
         self.publish_log("message not received")
+        self.message = False
+
+    async def wait_message(self, wait_period: float = None):
+        # Blocks until message is received or time limit expires
+        wait_period = wait_period if wait_period is not None else self.wait_period
+        self.timer = self.create_timer(wait_period, self.msg_not_received)
+
+        while self.message is None:
+            rclpy.spin_once(self)
+
+        self.timer.destroy()
+        message = self.message or None
         self.message = None
+        return message
 
     async def send_message(self, topic: str, message: str):
         self.sendmsg_pub = self.create_publisher(String, topic, 1)
@@ -94,8 +101,9 @@ class Skills(Node):
         pass
 
     async def authenticate_person(self):
+        await self.create_wait_message("nurse/fauth")
         await self.send_message("/led_strip/display", message='nurse')
-        auth_msg = await self.create_wait_message("/nurse/fauth")
+        auth_msg = await self.wait_message()
         return auth_msg == 'auth'
 
     async def operate_drawer(self):
@@ -127,5 +135,5 @@ if __name__ == "__main__":
         ]
     ]
 
-    asyncio.run(skills.create_wait_message('test'))
+    assert asyncio.run(skills.authenticate_person())
     rclpy.spin(skills)
