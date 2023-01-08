@@ -63,7 +63,7 @@ class Skills(Node):
 
             goal_poses.append(goal_pose)
 
-        self.nav.followWaypoints(goal_poses)
+        self.nav.goThroughPoses(goal_poses)
 
     async def create_wait_message(self, topic: str):
         self.waitmsg_sub = self.create_subscription(String, topic, self.msg_received, 1)
@@ -94,11 +94,11 @@ class Skills(Node):
         self.sendmsg_pub.publish(String(data=f"{message}"))
         self.publish_log("sent message")
 
-    async def approach_person(self):
-        pass
+    async def approach_person(self, goal_pose: PoseStamped):
+        self.nav.goToPose(goal_pose)
 
-    async def approach_robot(self):
-        pass
+    async def approach_robot(self, goal_pose: PoseStamped):
+        self.nav.goToPose(goal_pose)
 
     async def authenticate_person(self):
         await self.create_wait_message("nurse/fauth")
@@ -135,5 +135,5 @@ if __name__ == "__main__":
         ]
     ]
 
-    assert asyncio.run(skills.authenticate_person())
+    asyncio.run(skills.navigate(path))
     rclpy.spin(skills)
