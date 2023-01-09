@@ -40,24 +40,19 @@ class Skills(Node):
 
         self.nav_controller.setInitialPose(self.initial_pose)
 
-    def poselist_to_posestamped(self, *poses):
-        goal_poses = []
-        for pose in poses:
-            quaternion = quaternion_from_euler(0, 0, pose[-1])
+    def poselist_to_posestamped(self, pose):
+        quaternion = quaternion_from_euler(0, 0, pose[-1])
 
-            goal_pose = PoseStamped()
-            goal_pose.header.frame_id = 'map'
-            goal_pose.header.stamp = self.nav_controller.get_clock().now().to_msg()
-            goal_pose.pose.position.x = pose[0]
-            goal_pose.pose.position.y = pose[1]
-            goal_pose.pose.orientation.x = quaternion[0]
-            goal_pose.pose.orientation.y = quaternion[1]
-            goal_pose.pose.orientation.z = quaternion[2]
-            goal_pose.pose.orientation.w = quaternion[3]
-
-            goal_poses.append(goal_pose)
-
-        return goal_poses if len(goal_poses) > 1 else goal_poses[0]
+        goal_pose = PoseStamped()
+        goal_pose.header.frame_id = 'map'
+        goal_pose.header.stamp = self.nav_controller.get_clock().now().to_msg()
+        goal_pose.pose.position.x = pose[0]
+        goal_pose.pose.position.y = pose[1]
+        goal_pose.pose.orientation.x = quaternion[0]
+        goal_pose.pose.orientation.y = quaternion[1]
+        goal_pose.pose.orientation.z = quaternion[2]
+        goal_pose.pose.orientation.w = quaternion[3]
+        return goal_pose
 
     def publish_log(self, message: str):
         now = str(self.get_clock().now())
@@ -89,7 +84,7 @@ class Skills(Node):
             rclpy.spin_once(self)
 
         self.timer.destroy()
-        message = self.message or None
+        message = self.messages[topic] or None
         self.messages[topic] = None
         return message
 
@@ -143,6 +138,9 @@ if __name__ == "__main__":
         ]
     ]
 
-    goal_poses = skills.poselist_to_posestamped(path)
-    asyncio.run(skills.navigate(goal_poses))
+    goal_poses = []
+    for pose in path:
+        goal_poses.append(skills.poselist_to_posestamped(pose))
+    # asyncio.run(skills.navigate(goal_poses))
+    print(asyncio.run(skills.authenticate_person()))
     rclpy.spin(skills)
