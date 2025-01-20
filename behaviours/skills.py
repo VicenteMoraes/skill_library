@@ -91,7 +91,7 @@ class Skills(Node):
     async def send_message(self, topic: str, message: str):
         try:
             self.sendmsg_pub[topic]
-        except KeyError:
+        except TypeError:
             self.sendmsg_pub = self.create_publisher(String, topic, 1)
         finally:
             self.sendmsg_pub.publish(String(data=message))
