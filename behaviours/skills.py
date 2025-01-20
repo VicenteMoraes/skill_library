@@ -6,8 +6,8 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 
-from navigator import BasicNavigator
-from conversion import quaternion_from_euler
+from .navigator import BasicNavigator
+from .conversion import quaternion_from_euler
 
 CONFIG = json.loads(os.environ['CONFIG'])
 NAME = os.environ['ROBOT_NAME']
