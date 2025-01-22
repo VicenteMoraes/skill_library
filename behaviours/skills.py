@@ -5,14 +5,19 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
+import random
 
-from .navigator import BasicNavigator
+from .navigator import BasicNavigator, TaskResult
 from .conversion import quaternion_from_euler
 
 CONFIG = json.loads(os.environ['CONFIG'])
 NAME = os.environ['ROBOT_NAME']
 NAMESPACE = os.environ['ROBOT_NAMESPACE']
 POSE = json.loads(os.environ['ROBOT_POSE'])
+
+
+def formatlog(severity, who, loginfo, variable=None, skill=None, params=None):
+    return f"[{severity}], {who}, {loginfo}, {variable}, {skill}, {params}"
 
 
 class Skills(Node):
@@ -39,6 +44,7 @@ class Skills(Node):
         self.initial_pose.pose.orientation.w = POSE['w_rot']
 
         self.nav_controller.setInitialPose(self.initial_pose)
+        self.nav_controller.waitUntilNav2Active()
 
     def poselist_to_posestamped(self, pose):
         quaternion = quaternion_from_euler(0, 0, pose[-1])
@@ -54,14 +60,16 @@ class Skills(Node):
         goal_pose.pose.orientation.w = quaternion[3]
         return goal_pose
 
-    def publish_log(self, message: str):
-        now = str(self.get_clock().now())
+    def publish_log(self, message: str, severity: str = "INFO", variable=None, skills=None, params=None):
         log_msg = String()
-        log_msg.data = f"{now}_{message}"
+        log_msg.data = formatlog(severity, NAME, message, variable, skills, params)
         self.log_pub.publish(log_msg)
 
     async def navigate(self, goal_poses: [PoseStamped]):
         self.nav_controller.goThroughPoses(goal_poses)
+        while not self.nav_controller.isTaskComplete():
+            await asyncio.sleep(1)
+        return self.nav_controller.getResult() == TaskResult.SUCCEEDED
 
     async def create_wait_message(self, topic: str):
         self.waitmsg_sub[topic] = self.create_subscription(String, topic, (lambda msg: self.msg_received(msg, topic)), 1)
@@ -93,9 +101,14 @@ class Skills(Node):
             self.sendmsg_pub[topic]
         except KeyError:
             self.sendmsg_pub[topic] = self.create_publisher(String, topic, 1)
-        finally:
-            self.sendmsg_pub.publish(String(data=message))
+        except TypeError:
+            pass
+        if random.random() < 0.03:
+            return False
+
+        self.sendmsg_pub[topic].publish(String(data=message))
         self.publish_log("sent message")
+        return True
 
     async def approach_person(self, goal_pose: PoseStamped):
         self.nav_controller.goToPose(goal_pose)
@@ -104,14 +117,13 @@ class Skills(Node):
         self.nav_controller.goToPose(goal_pose)
 
     async def authenticate_person(self):
-        await self.create_wait_message("nurse/fauth")
-        await self.send_message("/led_strip/display", message='nurse')
-        auth_msg = await self.wait_for_message("nurse/fauth")
-        return auth_msg == 'auth'
+        return await self.send_message("/led_strip/display", message='nurse')
 
     async def operate_drawer(self):
-        await self.send_message('/drawer', message='operate')
-        return True
+        return await self.send_message('/drawer', message='operate')
+
+    async def approach(self, target):
+        return await self.send_message(f"/approach_{target}", message="performed approach")
 
 
 if __name__ == "__main__":
